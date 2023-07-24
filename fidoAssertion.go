@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
-	"github.com/google/uuid"
 )
 
 const tagAaid int16 = 0x2E0B
@@ -23,8 +22,8 @@ const tagUafv1SignedData int16 = 0x3E04
 const tagTransactionContextHash = 0x2E10
 
 // this might cause an issue
-const algSignSecp256R1EcdsaSha256Raw = 0x0001
-const algKeyEccX962Raw = 0x0100
+const algSignSecp256R1EcdsaSha256Der = 0x0002
+const algKeyEccX962Der = 0x0101
 
 const authModeUserVerified int8 = 1
 const authModeTxnContentVerified = 2
@@ -63,7 +62,7 @@ type Assertions struct {
 }
 
 func NewFidoRegistrationSignedAssertions(aaid string, signatureSignedData string,
-	pubKeyBas64Encoded string, privKeyBase64Encoded string, overriddenSignature string, finalChallengeParamsHash []byte) (*AuthenticatorSignAssertion, error) {
+	pubKeyBas64Encoded string, privKeyBase64Encoded string, overriddenSignature string, finalChallengeParamsHash []byte, keyId string) (*AuthenticatorSignAssertion, error) {
 
 	const authenticatorVersion int16 = 1
 	const signCounter int32 = 0
@@ -77,8 +76,8 @@ func NewFidoRegistrationSignedAssertions(aaid string, signatureSignedData string
 		authenticatorVersion:     authenticatorVersion,
 		signCounter:              signCounter,
 		registrationCounter:      registrationCounter,
-		signatureAlgAndEncoding:  algSignSecp256R1EcdsaSha256Raw,
-		publicKeyAlgAndEncoding:  algKeyEccX962Raw,
+		signatureAlgAndEncoding:  algSignSecp256R1EcdsaSha256Der,
+		publicKeyAlgAndEncoding:  algKeyEccX962Der,
 		overriddenSignature:      overriddenSignature,
 		signatureSignedData:      signatureSignedData,
 		finalChallengeParamsHash: finalChallengeParamsHash,
@@ -86,10 +85,10 @@ func NewFidoRegistrationSignedAssertions(aaid string, signatureSignedData string
 
 	fidoRegistrationSignedAssertionsBuilder := FidoRegistrationSignedAssertionsBuilder{assertions: assertion}
 
-	return fidoRegistrationSignedAssertionsBuilder.Build(privKeyBase64Encoded, pubKeyBas64Encoded)
+	return fidoRegistrationSignedAssertionsBuilder.Build(privKeyBase64Encoded, pubKeyBas64Encoded, keyId)
 }
 
-func NewFidoAuthenticationSignedAssertions(aaid string, pubKeyBas64Encoded string, privKeyBase64Encoded string, overriddenSignature string, signatureSignedData string, finalChallengeParamsHash []byte) (*AuthenticatorSignAssertion, error) {
+func NewFidoAuthenticationSignedAssertions(aaid string, pubKeyBas64Encoded string, privKeyBase64Encoded string, overriddenSignature string, signatureSignedData string, finalChallengeParamsHash []byte, keyId string) (*AuthenticatorSignAssertion, error) {
 
 	const authenticatorVersion int16 = 1
 	const signCounter int32 = 0
@@ -103,8 +102,8 @@ func NewFidoAuthenticationSignedAssertions(aaid string, pubKeyBas64Encoded strin
 		authenticatorVersion:     authenticatorVersion,
 		signCounter:              signCounter,
 		registrationCounter:      registrationCounter,
-		signatureAlgAndEncoding:  algSignSecp256R1EcdsaSha256Raw,
-		publicKeyAlgAndEncoding:  algKeyEccX962Raw,
+		signatureAlgAndEncoding:  algSignSecp256R1EcdsaSha256Der,
+		publicKeyAlgAndEncoding:  algKeyEccX962Der,
 		overriddenSignature:      overriddenSignature,
 		signatureSignedData:      signatureSignedData,
 		authenticationMode:       authModeUserVerified,
@@ -113,10 +112,10 @@ func NewFidoAuthenticationSignedAssertions(aaid string, pubKeyBas64Encoded strin
 
 	fidoAuthenticationAssertionsBuilder := FidoAuthenticationSignedAssertionsBuilder{assertions: assertion}
 
-	return fidoAuthenticationAssertionsBuilder.Build(privKeyBase64Encoded, pubKeyBas64Encoded)
+	return fidoAuthenticationAssertionsBuilder.Build(privKeyBase64Encoded, pubKeyBas64Encoded, keyId)
 }
 
-func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pubKeyStr string) (*AuthenticatorSignAssertion, error) {
+func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pubKeyStr string, keyId string) (*AuthenticatorSignAssertion, error) {
 	// Generate assertion structure
 	tlvObjectAaid := NewFidoUafTlvObject(tagAaid, []byte(fra.assertions.aaid))
 
@@ -129,8 +128,8 @@ func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pub
 
 	tlvFinalChallengeHash := NewFidoUafTlvObject(tagFinalChallengeHash, fra.assertions.finalChallengeParamsHash)
 
-    uuid := uuid.New()
-	tlvObjectKeyId := NewFidoUafTlvObject(tagKeyID, []byte(uuid.String()))
+	//Might be dynamic in the future, for now it's a username
+	tlvObjectKeyId := NewFidoUafTlvObject(tagKeyID, []byte(keyId))
 
 	objectCountersContentLength := 4 + 4
 	tlvObjectCounters := NewFidoUafTlvObjectWithSize(tagCounters, int16(objectCountersContentLength))
@@ -150,7 +149,7 @@ func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pub
 
 	// Generate attestation basic surrogate
 	// allow the ability to override the data signed in the response
-	krdSignature, err := SignDataLocal(tlvObjectKeyRegistrationData.GetByteArray(), privKeyStr, pubKeyStr)
+	krdSignature, err := SignDataLocal(tlvObjectKeyRegistrationData.GetByteArray(), privKeyStr)
 
 	if err != nil {
 		return nil, fmt.Errorf("Error creating signature")
@@ -173,7 +172,7 @@ func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pub
 	}, nil
 }
 
-func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, pubKeyStr string) (*AuthenticatorSignAssertion, error) {
+func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, pubKeyStr string, keyId string) (*AuthenticatorSignAssertion, error) {
 	// Generate assertion structure
 	tlvObjectAaid := NewFidoUafTlvObject(tagAaid, []byte(fra.assertions.aaid))
 
@@ -191,7 +190,8 @@ func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, p
 
 	tlvTransactionContentHash := NewFidoUafTlvObject(tagTransactionContextHash, fra.assertions.transactionTextHash)
 
-	tlvObjectKeyId := NewFidoUafTlvObject(tagKeyID, []byte("any"))
+	//Might be dynamic in the future, for now it's a username
+	tlvObjectKeyId := NewFidoUafTlvObject(tagKeyID, []byte(keyId))
 
 	var objectCountersContentLength = 4
 	tlvObjectCounters := NewFidoUafTlvObjectWithSize(tagCounters, int16(objectCountersContentLength))
@@ -209,7 +209,7 @@ func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, p
 
 	// Generate attestation basic surrogate
 	// allow the ability to override the data signed in the response
-	krdSignature, err := SignDataLocal(tlvObjectKeyAuthenticationData.GetByteArray(), privKeyStr, pubKeyStr)
+	krdSignature, err := SignDataLocal(tlvObjectKeyAuthenticationData.GetByteArray(), privKeyStr)
 
 	if err != nil {
 		return nil, fmt.Errorf("Error creating signature")

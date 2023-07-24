@@ -12,7 +12,8 @@ type SendUafResponse struct {
 
 func (k6fido *K6Fido) GenerateRegistrationResponse(aaid string, uafRequest string,
 	trustedFacetId string, overriddenSignature string, signatureSignData string,
-	privKey string, pubKey string) (string, error) {
+	privKey string, pubKey string, keyId string) (string, error) {
+
 	fidoRegistrationUafRequest := NewFidoRegistrationReturnUafRequest(uafRequest)
 
 	fidoRegistrationResponse := FidoRegistrationResponse{
@@ -20,7 +21,7 @@ func (k6fido *K6Fido) GenerateRegistrationResponse(aaid string, uafRequest strin
 		returnUafRequest: *fidoRegistrationUafRequest,
 	}
 
-	sendUafResponse, _ := fidoRegistrationResponse.Build(aaid, overriddenSignature, signatureSignData, privKey, pubKey)
+	sendUafResponse, _ := fidoRegistrationResponse.Build(aaid, overriddenSignature, signatureSignData, privKey, pubKey, keyId)
 
 	fidoRegistrationResponseString, err := json.Marshal(sendUafResponse)
 	if err != nil {
@@ -32,14 +33,9 @@ func (k6fido *K6Fido) GenerateRegistrationResponse(aaid string, uafRequest strin
 
 func (k6fido *K6Fido) GenerateAuthenticationResponse(aaid string, uafRequest string,
 	trustedFacetId string, overriddenSignature string, signatureSignData string,
-	privKey string, pubKey string, username string) (string, error) {
-
-	// fmt.Println(">> Generating Authentication Response.")
+	privKey string, pubKey string, username string, keyId string) (string, error) {
 
 	fidoAuthenticationUafRequest := NewFidoAuthenticationReturnUafRequest(uafRequest)
-
-	// fmt.Print("Fido Authentication UAF Request:")
-	// fmt.Println(fidoAuthenticationUafRequest)
 
 	fidoAuthenticationResponse := FidoAuthenticationResponse{
 		facetId:          trustedFacetId,
@@ -47,12 +43,11 @@ func (k6fido *K6Fido) GenerateAuthenticationResponse(aaid string, uafRequest str
 		username:         username,
 	}
 
-	sendUafResponse, _ := fidoAuthenticationResponse.Build(aaid, overriddenSignature, signatureSignData, privKey, pubKey)
+	sendUafResponse, _ := fidoAuthenticationResponse.Build(aaid, overriddenSignature, signatureSignData, privKey, pubKey, keyId)
 
 	fidoRegistrationResponseString, err := json.Marshal(sendUafResponse)
 	if err != nil {
 		return "", fmt.Errorf("Failed to marshall send ufa response: %s", err)
 	}
-	// fmt.Println(">> Generated Authentication Response.")
 	return string(fidoRegistrationResponseString), nil
 }

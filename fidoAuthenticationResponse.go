@@ -20,7 +20,7 @@ type FidoAuthenticationResponse struct {
 }
 
 func (b *FidoAuthenticationResponse) Build(aaid string, overriddenSignature string, signatureSignData string,
-	privKey string, pubKey string) (*SendUafResponse, error) {
+	privKey string, pubKey string, keyId string) (*SendUafResponse, error) {
 
 	var regRequestEntries []RegRequestEntry
 	err := json.Unmarshal([]byte(b.returnUafRequest.UafRequest), &regRequestEntries)
@@ -40,7 +40,7 @@ func (b *FidoAuthenticationResponse) Build(aaid string, overriddenSignature stri
 	base64FcString := base64.URLEncoding.EncodeToString(base64FcByte)
 	finalChallengeParamsHash := sha256.Sum256([]byte(base64FcString))
 
-	fidoAuthenticationSignedAssertions, err := NewFidoAuthenticationSignedAssertions(aaid, pubKey, privKey, overriddenSignature, signatureSignData, finalChallengeParamsHash[:])
+	fidoAuthenticationSignedAssertions, err := NewFidoAuthenticationSignedAssertions(aaid, pubKey, privKey, overriddenSignature, signatureSignData, finalChallengeParamsHash[:], keyId)
 	if err != nil {
 		return nil, fmt.Errorf("%s", "Failed to generate fido signature")
 	}
