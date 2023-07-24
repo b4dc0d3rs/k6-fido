@@ -30,12 +30,12 @@ type FidoRegistrationResponse struct {
 }
 
 func (b *FidoRegistrationResponse) Build(aaid string, overriddenSignature string, signatureSignData string,
-	privKey string, pubKey string) (*SendUafResponse, error) {
+	privKey string, pubKey string, keyId string) (*SendUafResponse, error) {
 
 	var regRequestEntries []RegRequestEntry
 	err := json.Unmarshal([]byte(b.returnUafRequest.UafRequest), &regRequestEntries)
 	if err != nil {
-		return nil, fmt.Errorf("Error unmarshalling uafRequest")
+		return nil, fmt.Errorf("Error unmarshalling uafRequest: %v", err)
 	}
 
 	regRequestEntry := regRequestEntries[0]
@@ -50,7 +50,7 @@ func (b *FidoRegistrationResponse) Build(aaid string, overriddenSignature string
 	base64FcString := base64.URLEncoding.EncodeToString(base64FcByte)
 	finalChallengeParamsHash := sha256.Sum256([]byte(base64FcString))
 
-	fidoRegistrationAssertion, _ := NewFidoRegistrationSignedAssertions(aaid, signatureSignData, pubKey, privKey, overriddenSignature, finalChallengeParamsHash[:])
+	fidoRegistrationAssertion, _ := NewFidoRegistrationSignedAssertions(aaid, signatureSignData, pubKey, privKey, overriddenSignature, finalChallengeParamsHash[:], keyId)
 	assertions := []AuthenticatorSignAssertion{*fidoRegistrationAssertion}
 
 	regResponseEntry := FidoResponseEntry{
@@ -63,7 +63,7 @@ func (b *FidoRegistrationResponse) Build(aaid string, overriddenSignature string
 
 	responseJson, err := json.Marshal(regResponseEntries)
 	if err != nil {
-		return nil, fmt.Errorf("Error marshalling registration response entries")
+		return nil, fmt.Errorf("Error marshalling registration response entries: %v", err)
 	}
 
 	sendUafResponse := &SendUafResponse{

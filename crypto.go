@@ -5,69 +5,83 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
+
 	"fmt"
 	"math/big"
 )
 
-func (k6fido *K6Fido) GenerateKeyPair() (string, string) {
-	curve := elliptic.P256()
-	privateKey, _ := ecdsa.GenerateKey(curve, rand.Reader)
-	publicKey := elliptic.Marshal(curve, privateKey.X, privateKey.Y)
-	return base64.StdEncoding.EncodeToString(privateKey.D.Bytes()), base64.StdEncoding.EncodeToString(publicKey)
+// Conventional format of the ECDSA signature
+type ECDSASignature struct {
+	R, S *big.Int
 }
 
-func (k6fido *K6Fido) SignData(data string, privKeyStr string, pubKeyStr string) (string, error) {
-	dataBytes := []byte(data)
-	signedDataByte, err := SignDataLocal(dataBytes, privKeyStr, pubKeyStr)
+// Externally visible: Generates an ECDSA DER formatted key pair
+func (k6fido *K6Fido) GenerateKeyPair() (string, string, error) {
+	curve := elliptic.P256()
+	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
-		return "", fmt.Errorf("Error signing data")
+		return "", "", fmt.Errorf("Failed to generate private key: %v", err)
 	}
 
-	signedData := base64.StdEncoding.EncodeToString(signedDataByte)
-	return signedData, nil
+	derPrivateKey, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to marshal private key: %v", err)
+	}
+
+	derPublicKey, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to marshal public key: %v", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(derPrivateKey), base64.StdEncoding.EncodeToString(derPublicKey), nil
 }
 
-// SignData signs the data using the ECDSA private key and SHA256 hashing algorithm
-func SignDataLocal(data []byte, privKeyStr string, pubKeyStr string) ([]byte, error) {
-	curve := elliptic.P256()
-
-	privKeyBytes, err := base64.StdEncoding.DecodeString(privKeyStr)
+// Externally visible: Signs the passed signature data using the ECDSA DER formatted private key
+func (k6fido *K6Fido) SignData(signatureData string, base64PrivateKey string) (string, error) {
+	signatureDataBytes := []byte(signatureData)
+	signedData, err := SignDataLocal(signatureDataBytes, base64PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("Error decoding private key: %v", err)
+		return "", fmt.Errorf("Failed to sign data: %v", err)
 	}
+	return base64.StdEncoding.EncodeToString(signedData), nil
+}
 
-	privKey := new(ecdsa.PrivateKey)
-	privKey.Curve = curve
-	privKey.D = new(big.Int).SetBytes(privKeyBytes)
-
-	// Might want to delete later
-	pubKeyBytes, err := base64.StdEncoding.DecodeString(pubKeyStr)
+// Signs the passed signature data using the ECDSA DER formatted private key
+func SignDataLocal(signatureData []byte, base64PrivateKey string) ([]byte, error) {
+	derPrivateKey, err := base64.StdEncoding.DecodeString(base64PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("Error decoding public key: %v", err)
+		return nil, fmt.Errorf("Failed to decode base64 private key: %v", err)
 	}
 
-	pubKeyX, pubKeyY := elliptic.Unmarshal(curve, pubKeyBytes)
-	if pubKeyX == nil {
-		return nil, fmt.Errorf("Error unmarshalling public key")
+	privateKeyInterface, err := x509.ParsePKCS8PrivateKey(derPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse PKCS8 private key: %v", err)
+	}
+	privateKey, ok := privateKeyInterface.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("Could not assert privateKeyInterface to an *ecdsa.PrivateKey")
 	}
 
-	privKey.PublicKey = ecdsa.PublicKey{Curve: curve, X: pubKeyX, Y: pubKeyY}
-
-	// Hash the data
 	h := sha256.New()
-	h.Write(data)
+	h.Write(signatureData)
 	hash := h.Sum(nil)
 
-	// Sign the hash using the private key
-	r, s, err := ecdsa.Sign(rand.Reader, privKey, hash)
+	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hash)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to sign data: %v", err)
 	}
 
-	signature := r.Bytes()
-	signature = append(signature, s.Bytes()...)
+	// Create an ECDSASignature instance
+	ecdsaSig := ECDSASignature{r, s}
 
-	// Encode the signature to base64
+	// Marshal the signature into ASN.1 DER form
+	signature, err := asn1.Marshal(ecdsaSig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 DER marshal ECDSA signature: %v", err)
+	}
+
 	return signature, nil
 }

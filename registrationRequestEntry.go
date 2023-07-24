@@ -29,7 +29,7 @@ type Header struct {
 type RegRequestEntry struct {
 	Header      Header        `json:"header"`
 	Challenge   string        `json:"challenge"`
-	// Username    string        `json:"username"`
+	Username    string        `json:"username"`
 	Policy      Policy        `json:"policy"`
 	Transaction []Transaction `json:"transaction"`
 }
