@@ -25,7 +25,7 @@ func (b *FidoAuthenticationResponse) Build(aaid string, overriddenSignature stri
 	var regRequestEntries []RegRequestEntry
 	err := json.Unmarshal([]byte(b.returnUafRequest.UafRequest), &regRequestEntries)
 	if err != nil {
-		return nil, fmt.Errorf("Error unmarshalling uafRequest")
+		return nil, fmt.Errorf("Error unmarshalling uafRequest: %v", err)
 	}
 
 	regRequestEntry := regRequestEntries[0]
@@ -42,7 +42,7 @@ func (b *FidoAuthenticationResponse) Build(aaid string, overriddenSignature stri
 
 	fidoAuthenticationSignedAssertions, err := NewFidoAuthenticationSignedAssertions(aaid, pubKey, privKey, overriddenSignature, signatureSignData, finalChallengeParamsHash[:], keyId)
 	if err != nil {
-		return nil, fmt.Errorf("%s", "Failed to generate fido signature")
+		return nil, fmt.Errorf("Failed to build authentication assertions: %v", err)
 	}
 	assertions := []AuthenticatorSignAssertion{*fidoAuthenticationSignedAssertions}
 
@@ -56,7 +56,7 @@ func (b *FidoAuthenticationResponse) Build(aaid string, overriddenSignature stri
 
 	responseJson, err := json.Marshal(regResponseEntries)
 	if err != nil {
-		return nil, fmt.Errorf("Error marshalling registration response entries")
+		return nil, fmt.Errorf("Error marshalling registration response entries: %v", err)
 	}
 
 	context := make(map[string]interface{})
@@ -64,7 +64,7 @@ func (b *FidoAuthenticationResponse) Build(aaid string, overriddenSignature stri
 
 	contextJson, err := json.Marshal(context)
 	if err != nil {
-		// handle error
+		return nil, fmt.Errorf("Error marshalling context: %v", err)
 	}
 	contextString := string(contextJson)
 

@@ -35,7 +35,7 @@ func (b *FidoRegistrationResponse) Build(aaid string, overriddenSignature string
 	var regRequestEntries []RegRequestEntry
 	err := json.Unmarshal([]byte(b.returnUafRequest.UafRequest), &regRequestEntries)
 	if err != nil {
-		return nil, fmt.Errorf("Error unmarshalling uafRequest")
+		return nil, fmt.Errorf("Error unmarshalling uafRequest: %v", err)
 	}
 
 	regRequestEntry := regRequestEntries[0]
@@ -63,7 +63,7 @@ func (b *FidoRegistrationResponse) Build(aaid string, overriddenSignature string
 
 	responseJson, err := json.Marshal(regResponseEntries)
 	if err != nil {
-		return nil, fmt.Errorf("Error marshalling registration response entries")
+		return nil, fmt.Errorf("Error marshalling registration response entries: %v", err)
 	}
 
 	sendUafResponse := &SendUafResponse{

@@ -21,7 +21,6 @@ const tagUafv1AuthAssertion int16 = 0x3E02
 const tagUafv1SignedData int16 = 0x3E04
 const tagTransactionContextHash = 0x2E10
 
-// this might cause an issue
 const algSignSecp256R1EcdsaSha256Der = 0x0002
 const algKeyEccX962Der = 0x0101
 
@@ -116,7 +115,6 @@ func NewFidoAuthenticationSignedAssertions(aaid string, pubKeyBas64Encoded strin
 }
 
 func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pubKeyStr string, keyId string) (*AuthenticatorSignAssertion, error) {
-	// Generate assertion structure
 	tlvObjectAaid := NewFidoUafTlvObject(tagAaid, []byte(fra.assertions.aaid))
 
 	var assertionInfoContentLength = 2 + 1 + 2 + 2
@@ -128,7 +126,6 @@ func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pub
 
 	tlvFinalChallengeHash := NewFidoUafTlvObject(tagFinalChallengeHash, fra.assertions.finalChallengeParamsHash)
 
-	//Might be dynamic in the future, for now it's a username
 	tlvObjectKeyId := NewFidoUafTlvObject(tagKeyID, []byte(keyId))
 
 	objectCountersContentLength := 4 + 4
@@ -147,12 +144,10 @@ func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pub
 		tlvObjectPubKey,
 	}...)
 
-	// Generate attestation basic surrogate
-	// allow the ability to override the data signed in the response
 	krdSignature, err := SignDataLocal(tlvObjectKeyRegistrationData.GetByteArray(), privKeyStr)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error creating signature")
+		return nil, fmt.Errorf("Error creating signature: %v", err)
 	}
 
 	tlvObjectSignature := NewFidoUafTlvObject(tagSignature, krdSignature)
@@ -173,7 +168,6 @@ func (fra *FidoRegistrationSignedAssertionsBuilder) Build(privKeyStr string, pub
 }
 
 func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, pubKeyStr string, keyId string) (*AuthenticatorSignAssertion, error) {
-	// Generate assertion structure
 	tlvObjectAaid := NewFidoUafTlvObject(tagAaid, []byte(fra.assertions.aaid))
 
 	var assertionInfoContentLength = 2 + 1 + 2
@@ -190,7 +184,6 @@ func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, p
 
 	tlvTransactionContentHash := NewFidoUafTlvObject(tagTransactionContextHash, fra.assertions.transactionTextHash)
 
-	//Might be dynamic in the future, for now it's a username
 	tlvObjectKeyId := NewFidoUafTlvObject(tagKeyID, []byte(keyId))
 
 	var objectCountersContentLength = 4
@@ -207,12 +200,10 @@ func (fra *FidoAuthenticationSignedAssertionsBuilder) Build(privKeyStr string, p
 		tlvObjectCounters,
 	}...)
 
-	// Generate attestation basic surrogate
-	// allow the ability to override the data signed in the response
 	krdSignature, err := SignDataLocal(tlvObjectKeyAuthenticationData.GetByteArray(), privKeyStr)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error creating signature")
+		return nil, fmt.Errorf("Error creating signature: %v", err)
 	}
 
 	tlvObjectSignature := NewFidoUafTlvObject(tagSignature, krdSignature)
